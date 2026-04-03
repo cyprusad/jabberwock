@@ -9,90 +9,93 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     body {
-      background: #1a1a1a;
+      background: #f4ecd8;
       min-height: 100vh;
-      padding: 40px;
+      padding: 60px;
       font-family: 'Georgia', 'Times New Roman', serif;
     }
     
     #container {
-      max-width: 800px;
+      max-width: 700px;
       margin: 0 auto;
-      position: relative;
     }
     
     h1 {
-      color: #d4af37;
+      color: #2c2416;
       text-align: center;
-      font-size: 28px;
-      margin-bottom: 30px;
-      letter-spacing: 3px;
+      font-size: 32px;
+      margin-bottom: 40px;
+      letter-spacing: 4px;
       text-transform: uppercase;
+      font-weight: normal;
+      border-bottom: 1px solid #d4c9b0;
+      padding-bottom: 20px;
     }
     
     #poem {
-      font-size: 20px;
-      line-height: 2;
-      color: #888;
-      text-align: justify;
+      font-size: 18px;
+      line-height: 2.2;
+      color: #3d3d3d;
+      text-align: left;
     }
     
     .word {
       display: inline-block;
-      transition: all 0.3s ease;
-      margin: 2px;
+      transition: all 0.4s ease;
+      margin: 3px;
+      padding: 2px 4px;
     }
     
     .word.focused {
-      color: #d4af37;
-      font-size: 28px;
-      transform: scale(1.1);
-      text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+      color: #8b0000;
+      font-size: 26px;
+      transform: scale(1.15);
+      font-weight: bold;
     }
     
     .word.unfocused {
-      color: #444;
-      letter-spacing: 2px;
-    }
-    
-    #calibration {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: rgba(0,0,0,0.8);
-      color: #d4af37;
-      padding: 15px;
-      border-radius: 8px;
-      font-size: 14px;
-      max-width: 300px;
+      color: #a0a0a0;
     }
     
     #status {
       position: fixed;
       top: 20px;
-      left: 20px;
-      color: #d4af37;
+      right: 20px;
+      color: #8b0000;
       font-size: 14px;
+      background: #f4ecd8;
+      padding: 10px 15px;
+      border: 1px solid #d4c9b0;
+      border-radius: 4px;
+    }
+    
+    #calibration {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: #f4ecd8;
+      color: #2c2416;
+      padding: 20px;
+      border: 1px solid #d4c9b0;
+      border-radius: 4px;
+      font-size: 14px;
+      max-width: 350px;
+      line-height: 1.6;
     }
     
     canvas#webgazerVideoFeed {
       position: fixed !important;
-      top: 0 !important;
-      left: 0 !important;
-      width: 320px !important;
-      height: 240px !important;
-      border: 2px solid #d4af37 !important;
+      top: 20px !important;
+      left: 20px !important;
+      width: 200px !important;
       border-radius: 8px;
-      opacity: 0.8;
-    }
-    
-    #webgazerVideoFeed video {
-      border-radius: 8px;
+      opacity: 0.6;
+      border: 2px solid #8b0000 !important;
     }
   </style>
 </head>
 <body>
-  <div id="status">Initializing eye tracking...</div>
+  <div id="status">Loading...</div>
   
   <div id="container">
     <h1>Jabberwocky</h1>
@@ -100,12 +103,13 @@
   </div>
   
   <div id="calibration">
-    Click on various points on the screen to calibrate the eye tracker. 
-    Look at each word for a moment to see it light up.
+    <strong>Eye Tracking Active</strong><br>
+    Look at the words - the one you're focusing on will highlight.<br>
+    <small>Click a few times around the page to calibrate.</small>
   </div>
 
   <script type="module">
-    import { prepareWithSegments, layoutWithLines } from '../slowreader/pretext.js';
+    import { prepareWithSegments, layoutWithLines } from './pretext.js';
 
     const TEXT = `'Twas brillig, and the slithy toves
 Did gyre and gimble in the wabe:
@@ -142,28 +146,27 @@ Did gyre and gimble in the wabe:
 All mimsy were the borogoves,
 And the mome raths outgrabe.`;
 
-    const FONT = '22px Georgia, "Times New Roman", serif';
-    const LINE_HEIGHT = 44;
+    const FONT = '20px Georgia, "Times New Roman", serif';
+    const LINE_HEIGHT = 48;
 
     const poemEl = document.getElementById('poem');
     const statusEl = document.getElementById('status');
     const calibrationEl = document.getElementById('calibration');
 
     function getMaxWidth() {
-      return 750;
+      return 650;
     }
 
     const prepared = prepareWithSegments(TEXT, FONT, { whiteSpace: 'pre-wrap' });
     const { lines } = layoutWithLines(prepared, getMaxWidth(), LINE_HEIGHT);
 
-    const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
     const wordElements = [];
 
     for (let li = 0; li < lines.length; li++) {
       const line = lines[li];
       const words = line.text.split(/(\s+)/);
       const lineDiv = document.createElement('div');
-      lineDiv.style.marginBottom = '20px';
+      lineDiv.style.marginBottom = '24px';
       
       for (let wi = 0; wi < words.length; wi++) {
         const wordText = words[wi];
@@ -176,33 +179,47 @@ And the mome raths outgrabe.`;
         wordSpan.className = 'word unfocused';
         wordSpan.textContent = wordText;
         lineDiv.appendChild(wordSpan);
+        
         wordElements.push({
           element: wordSpan,
           text: wordText,
-          lineIndex: li
+          rect: null
         });
       }
       
       poemEl.appendChild(lineDiv);
     }
 
+    setTimeout(() => {
+      for (const word of wordElements) {
+        word.rect = word.element.getBoundingClientRect();
+      }
+    }, 500);
+
+    let lastUpdate = 0;
+
     webgazer
       .setGazeListener((data, timestamp) => {
         if (data == null) return;
         
-        statusEl.textContent = `Eye position: ${Math.round(data.x)}, ${Math.round(data.y)}`;
+        const now = Date.now();
+        if (now - lastUpdate < 100) return;
+        lastUpdate = now;
+        
+        statusEl.textContent = `Watching: ${Math.round(data.x)}, ${Math.round(data.y)}`;
         
         let closestWord = null;
         let closestDistance = Infinity;
         
         for (const word of wordElements) {
-          const rect = word.element.getBoundingClientRect();
-          const centerX = rect.left + rect.width / 2;
-          const centerY = rect.top + rect.height / 2;
+          if (!word.rect) continue;
+          
+          const centerX = word.rect.left + word.rect.width / 2;
+          const centerY = word.rect.top + word.rect.height / 2;
           
           const distance = Math.hypot(data.x - centerX, data.y - centerY);
           
-          if (distance < closestDistance && distance < 150) {
+          if (distance < closestDistance && distance < 100) {
             closestDistance = distance;
             closestWord = word;
           }
@@ -222,17 +239,24 @@ And the mome raths outgrabe.`;
       .begin();
     
     webgazer.on('start', () => {
-      statusEl.textContent = 'Eye tracking active - Click to calibrate';
+      statusEl.textContent = 'Eye tracking active';
     });
     
     webgazer.on('ready', () => {
-      calibrationEl.style.display = 'block';
-      statusEl.textContent = 'Move your eyes around the text. Words will light up where you look.';
+      statusEl.textContent = 'Look at the words';
     });
 
     setTimeout(() => {
       calibrationEl.style.display = 'none';
-    }, 15000);
+    }, 10000);
+    
+    window.addEventListener('resize', () => {
+      setTimeout(() => {
+        for (const word of wordElements) {
+          word.rect = word.element.getBoundingClientRect();
+        }
+      }, 100);
+    });
   </script>
 </body>
 </html>
