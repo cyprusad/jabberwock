@@ -67,7 +67,26 @@
       padding: 10px 15px;
       border: 1px solid #d4c9b0;
       border-radius: 4px;
-      display: none;
+    }
+    
+    #calibration-box {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      background: #f4ecd8;
+      color: #2c2416;
+      padding: 20px;
+      border: 2px solid #8b0000;
+      border-radius: 8px;
+      font-size: 16px;
+      max-width: 400px;
+      text-align: center;
+      z-index: 100;
+    }
+    
+    #calibration-box.success {
+      border-color: #2e7d32;
+      color: #2e7d32;
     }
     
     #eye-dot {
@@ -107,12 +126,12 @@
   </style>
 </head>
 <body>
-  <div id="status">Loading...</div>
+  <div id="status">Click "Allow" to enable eye tracking</div>
   <div id="eye-dot"></div>
-  
-  <div id="container">
-    <h1>Jabberwocky</h1>
-    <div id="poem"></div>
+  <div id="calibration-box">
+    <strong>Calibration needed</strong><br>
+    Click on different words around the page to calibrate.<br>
+    Then look at words to see them highlight.
   </div>
   
   <div id="calibration">
@@ -164,7 +183,7 @@ And the mome raths outgrabe.`;
 
     const poemEl = document.getElementById('poem');
     const statusEl = document.getElementById('status');
-    const calibrationEl = document.getElementById('calibration');
+    const calibrationBoxEl = document.getElementById('calibration-box');
     const eyeDot = document.getElementById('eye-dot');
 
     function getMaxWidth() {
@@ -265,8 +284,17 @@ And the mome raths outgrabe.`;
     });
 
     setTimeout(() => {
-      calibrationEl.style.display = 'none';
-    }, 10000);
+      calibrationBoxEl.style.display = 'none';
+    }, 15000);
+    
+    // Show video briefly on click for calibration
+    document.addEventListener('click', () => {
+      const video = document.querySelector('#webgazerVideoFeed');
+      if (video) {
+        video.style.display = 'block';
+        setTimeout(() => { video.style.display = 'none'; }, 2000);
+      }
+    });
     
     window.addEventListener('resize', () => {
       setTimeout(() => {
