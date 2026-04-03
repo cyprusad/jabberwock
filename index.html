@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jabberwocky - Eye Tracking Demo</title>
+  <script src="https://webgazer.cs.brown.edu/webgazer.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      background: #1a1a1a;
+      min-height: 100vh;
+      padding: 40px;
+      font-family: 'Georgia', 'Times New Roman', serif;
+    }
+    
+    #container {
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+    }
+    
+    h1 {
+      color: #d4af37;
+      text-align: center;
+      font-size: 28px;
+      margin-bottom: 30px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+    
+    #poem {
+      font-size: 20px;
+      line-height: 2;
+      color: #888;
+      text-align: justify;
+    }
+    
+    .word {
+      display: inline-block;
+      transition: all 0.3s ease;
+      margin: 2px;
+    }
+    
+    .word.focused {
+      color: #d4af37;
+      font-size: 28px;
+      transform: scale(1.1);
+      text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+    }
+    
+    .word.unfocused {
+      color: #444;
+      letter-spacing: 2px;
+    }
+    
+    #calibration {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(0,0,0,0.8);
+      color: #d4af37;
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 14px;
+      max-width: 300px;
+    }
+    
+    #status {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      color: #d4af37;
+      font-size: 14px;
+    }
+    
+    canvas#webgazerVideoFeed {
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 320px !important;
+      height: 240px !important;
+      border: 2px solid #d4af37 !important;
+      border-radius: 8px;
+      opacity: 0.8;
+    }
+    
+    #webgazerVideoFeed video {
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div id="status">Initializing eye tracking...</div>
+  
+  <div id="container">
+    <h1>Jabberwocky</h1>
+    <div id="poem"></div>
+  </div>
+  
+  <div id="calibration">
+    Click on various points on the screen to calibrate the eye tracker. 
+    Look at each word for a moment to see it light up.
+  </div>
+
+  <script type="module">
+    import { prepareWithSegments, layoutWithLines } from '../slowreader/pretext.js';
+
+    const TEXT = `'Twas brillig, and the slithy toves
+Did gyre and gimble in the wabe:
+All mimsy were the borogoves,
+And the mome raths outgrabe."
+
+"Beware the Jabberwock, my son!
+The jaws that bite, the claws that catch!
+Beware the Jubjub bird, and shun
+The frumious Bandersnatch!"
+
+He took his vorpal sword in hand;
+Long time the manxome foe he sought—
+So rested he by the Tumtum tree
+And stood awhile in thought.
+
+And, as in uffish thought he stood,
+The Jabberwock, with eyes of flame,
+Came whiffling through the tulgey wood,
+And burbled as it came!
+
+One, two! One, two! And through and through
+The vorpal blade went snicker-snack!
+He left it dead, and with its head
+He went galumphing back.
+
+"And hast thou slain the Jabberwock?
+Come to my arms, my beamish boy!
+O frabjous day! Callooh! Callay!"
+He chortled in his joy.
+
+'Twas brillig, and the slithy toves
+Did gyre and gimble in the wabe:
+All mimsy were the borogoves,
+And the mome raths outgrabe.`;
+
+    const FONT = '22px Georgia, "Times New Roman", serif';
+    const LINE_HEIGHT = 44;
+
+    const poemEl = document.getElementById('poem');
+    const statusEl = document.getElementById('status');
+    const calibrationEl = document.getElementById('calibration');
+
+    function getMaxWidth() {
+      return 750;
+    }
+
+    const prepared = prepareWithSegments(TEXT, FONT, { whiteSpace: 'pre-wrap' });
+    const { lines } = layoutWithLines(prepared, getMaxWidth(), LINE_HEIGHT);
+
+    const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+    const wordElements = [];
+
+    for (let li = 0; li < lines.length; li++) {
+      const line = lines[li];
+      const words = line.text.split(/(\s+)/);
+      const lineDiv = document.createElement('div');
+      lineDiv.style.marginBottom = '20px';
+      
+      for (let wi = 0; wi < words.length; wi++) {
+        const wordText = words[wi];
+        if (wordText.trim() === '') {
+          lineDiv.appendChild(document.createTextNode(wordText));
+          continue;
+        }
+        
+        const wordSpan = document.createElement('span');
+        wordSpan.className = 'word unfocused';
+        wordSpan.textContent = wordText;
+        lineDiv.appendChild(wordSpan);
+        wordElements.push({
+          element: wordSpan,
+          text: wordText,
+          lineIndex: li
+        });
+      }
+      
+      poemEl.appendChild(lineDiv);
+    }
+
+    webgazer
+      .setGazeListener((data, timestamp) => {
+        if (data == null) return;
+        
+        statusEl.textContent = `Eye position: ${Math.round(data.x)}, ${Math.round(data.y)}`;
+        
+        let closestWord = null;
+        let closestDistance = Infinity;
+        
+        for (const word of wordElements) {
+          const rect = word.element.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          
+          const distance = Math.hypot(data.x - centerX, data.y - centerY);
+          
+          if (distance < closestDistance && distance < 150) {
+            closestDistance = distance;
+            closestWord = word;
+          }
+        }
+        
+        for (const word of wordElements) {
+          if (word === closestWord) {
+            word.element.classList.add('focused');
+            word.element.classList.remove('unfocused');
+          } else {
+            word.element.classList.remove('focused');
+            word.element.classList.add('unfocused');
+          }
+        }
+      })
+      .saveDataAcrossSessions(true)
+      .begin();
+    
+    webgazer.on('start', () => {
+      statusEl.textContent = 'Eye tracking active - Click to calibrate';
+    });
+    
+    webgazer.on('ready', () => {
+      calibrationEl.style.display = 'block';
+      statusEl.textContent = 'Move your eyes around the text. Words will light up where you look.';
+    });
+
+    setTimeout(() => {
+      calibrationEl.style.display = 'none';
+    }, 15000);
+  </script>
+</body>
+</html>
