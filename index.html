@@ -35,7 +35,7 @@
     #poem {
       font-size: 18px;
       line-height: 2.2;
-      color: #3d3d3d;
+      color: #000;
       text-align: left;
     }
     
@@ -54,14 +54,14 @@
     }
     
     .word.unfocused {
-      color: #000000;
+      color: #000;
     }
     
     #status {
       position: fixed;
       top: 20px;
       right: 20px;
-      color: #8b0000;
+      color: #2c2416;
       font-size: 14px;
       background: #f4ecd8;
       padding: 10px 15px;
@@ -84,60 +84,42 @@
       z-index: 100;
     }
     
-    #calibration-box.success {
-      border-color: #2e7d32;
-      color: #2e7d32;
+    canvas#webgazerVideoFeed {
+      display: none !important;
     }
     
     #eye-dot {
       position: fixed;
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       background: #8b0000;
       border-radius: 50%;
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.3s;
       z-index: 1000;
-      box-shadow: 0 0 4px #8b0000;
+      box-shadow: 0 0 8px #8b0000;
+      display: none;
     }
     
     #eye-dot.active {
+      display: block;
       opacity: 0.8;
-    }
-    
-    #calibration {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      background: #f4ecd8;
-      color: #2c2416;
-      padding: 20px;
-      border: 1px solid #d4c9b0;
-      border-radius: 4px;
-      font-size: 14px;
-      max-width: 350px;
-      line-height: 1.6;
-    }
-    
-    canvas#webgazerVideoFeed {
-      display: none !important;
     }
   </style>
 </head>
 <body>
-  <div id="status">Click "Allow" to enable eye tracking</div>
+  <div id="status">Click to start</div>
   <div id="eye-dot"></div>
   <div id="calibration-box">
-    <strong>Calibration needed</strong><br>
-    Click on different words around the page to calibrate.<br>
-    Then look at words to see them highlight.
+    <strong>Click anywhere to start</strong><br>
+    Eye tracking needs webcam access.<br>
+    If it doesn't work, the highlight will follow your mouse.
   </div>
   
-  <div id="calibration">
-    <strong>Eye Tracking Active</strong><br>
-    Look at the words - the one you're focusing on will highlight.<br>
-    <small>Click a few times around the page to calibrate.</small>
+  <div id="container">
+    <h1>Jabberwocky</h1>
+    <div id="poem"></div>
   </div>
 
   <script type="module">
@@ -209,7 +191,7 @@ And the mome raths outgrabe.`;
         }
         
         const wordSpan = document.createElement('span');
-        wordSpan.className = 'word unfocused';
+        wordSpan.className = 'word';
         wordSpan.textContent = wordText;
         lineDiv.appendChild(wordSpan);
         
@@ -229,80 +211,102 @@ And the mome raths outgrabe.`;
       }
     }, 500);
 
-    let lastUpdate = 0;
+    let useMouseFallback = false;
+    let lastX = 0, lastY = 0;
 
-    webgazer
-      .setGazeListener((data, timestamp) => {
-        if (data == null) return;
+    function updateFocus(x, y) {
+      statusEl.textContent = `Tracking at: ${Math.round(x)}, ${Math.round(y)}`;
+      
+      eyeDot.style.left = (x - 7) + 'px';
+      eyeDot.style.top = (y - 7) + 'px';
+      eyeDot.classList.add('active');
+      
+      let closestWord = null;
+      let closestDistance = Infinity;
+      
+      for (const word of wordElements) {
+        if (!word.rect) continue;
         
-        const now = Date.now();
-        if (now - lastUpdate < 100) return;
-        lastUpdate = now;
+        const centerX = word.rect.left + word.rect.width / 2;
+        const centerY = word.rect.top + word.rect.height / 2;
         
-        statusEl.textContent = `Watching: ${Math.round(data.x)}, ${Math.round(data.y)}`;
+        const distance = Math.hypot(x - centerX, y - centerY);
         
-        let closestWord = null;
-        let closestDistance = Infinity;
-        
-        for (const word of wordElements) {
-          if (!word.rect) continue;
-          
-          const centerX = word.rect.left + word.rect.width / 2;
-          const centerY = word.rect.top + word.rect.height / 2;
-          
-          const distance = Math.hypot(data.x - centerX, data.y - centerY);
-          
-          if (distance < closestDistance && distance < 100) {
-            closestDistance = distance;
-            closestWord = word;
-          }
+        if (distance < closestDistance && distance < 120) {
+          closestDistance = distance;
+          closestWord = word;
         }
-        
-        for (const word of wordElements) {
-          if (word === closestWord) {
-            word.element.classList.add('focused');
-            word.element.classList.remove('unfocused');
-          } else {
-            word.element.classList.remove('focused');
-            word.element.classList.add('unfocused');
-          }
+      }
+      
+      for (const word of wordElements) {
+        if (word === closestWord) {
+          word.element.classList.add('focused');
+        } else {
+          word.element.classList.remove('focused');
         }
-        
-        eyeDot.style.left = (data.x - 6) + 'px';
-        eyeDot.style.top = (data.y - 6) + 'px';
-        eyeDot.classList.add('active');
-      })
-      .saveDataAcrossSessions(true)
-      .begin();
-    
-    webgazer.on('start', () => {
-      statusEl.textContent = 'Eye tracking active';
-    });
-    
-    webgazer.on('ready', () => {
-      statusEl.textContent = 'Look at the words';
-    });
+      }
+    }
 
-    setTimeout(() => {
-      calibrationBoxEl.style.display = 'none';
-    }, 15000);
-    
-    // Show video briefly on click for calibration
-    document.addEventListener('click', () => {
+    function startTracking() {
+      calibrationBoxEl.innerHTML = '<strong>Calibrating...</strong><br>Click on words to help the tracker learn.<br>Or just move your mouse around.';
+      
+      try {
+        webgazer
+          .setGazeListener((data, timestamp) => {
+            if (data == null) return;
+            updateFocus(data.x, data.y);
+          })
+          .saveDataAcrossSessions(true)
+          .begin();
+        
+        webgazer.on('start', () => {
+          calibrationBoxEl.innerHTML = '<strong>Eye tracking active!</strong><br>Look at the words - they will highlight.';
+          setTimeout(() => { calibrationBoxEl.style.display = 'none'; }, 5000);
+        });
+      } catch (e) {
+        console.log('Eye tracking failed, using mouse:', e);
+        useMouseFallback = true;
+      }
+    }
+
+    document.addEventListener('click', (e) => {
+      if (!window.webgazer) {
+        return;
+      }
+      
+      if (!window.webgazer.isReady()) {
+        startTracking();
+      }
+      
+      // Show video briefly for calibration
       const video = document.querySelector('#webgazerVideoFeed');
       if (video) {
         video.style.display = 'block';
-        setTimeout(() => { video.style.display = 'none'; }, 2000);
+        video.style.position = 'fixed';
+        video.style.bottom = '10px';
+        video.style.right = '10px';
+        video.style.width = '160px';
+        video.style.opacity = '0.7';
+        video.style.border = '2px solid #8b0000';
+        setTimeout(() => { video.style.display = 'none'; }, 3000);
       }
     });
-    
-    window.addEventListener('resize', () => {
-      setTimeout(() => {
-        for (const word of wordElements) {
-          word.rect = word.element.getBoundingClientRect();
-        }
-      }, 100);
+
+    document.addEventListener('mousemove', (e) => {
+      lastX = e.clientX;
+      lastY = e.clientY;
+      
+      // Use mouse as immediate feedback while waiting for eye tracking
+      if (!eyeDot.classList.contains('active')) {
+        updateFocus(e.clientX, e.clientY);
+      }
     });
+
+    // Check if WebGazer loaded
+    if (typeof webgazer === 'undefined') {
+      statusEl.textContent = 'WebGazer not loaded - using mouse';
+      useMouseFallback = true;
+    }
   </script>
 </body>
 </html>
