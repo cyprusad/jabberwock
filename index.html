@@ -54,7 +54,7 @@
     }
     
     .word.unfocused {
-      color: #a0a0a0;
+      color: #000000;
     }
     
     #status {
@@ -67,6 +67,24 @@
       padding: 10px 15px;
       border: 1px solid #d4c9b0;
       border-radius: 4px;
+      display: none;
+    }
+    
+    #eye-dot {
+      position: fixed;
+      width: 12px;
+      height: 12px;
+      background: #8b0000;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 1000;
+      box-shadow: 0 0 4px #8b0000;
+    }
+    
+    #eye-dot.active {
+      opacity: 0.8;
     }
     
     #calibration {
@@ -84,18 +102,13 @@
     }
     
     canvas#webgazerVideoFeed {
-      position: fixed !important;
-      top: 20px !important;
-      left: 20px !important;
-      width: 200px !important;
-      border-radius: 8px;
-      opacity: 0.6;
-      border: 2px solid #8b0000 !important;
+      display: none !important;
     }
   </style>
 </head>
 <body>
   <div id="status">Loading...</div>
+  <div id="eye-dot"></div>
   
   <div id="container">
     <h1>Jabberwocky</h1>
@@ -152,6 +165,7 @@ And the mome raths outgrabe.`;
     const poemEl = document.getElementById('poem');
     const statusEl = document.getElementById('status');
     const calibrationEl = document.getElementById('calibration');
+    const eyeDot = document.getElementById('eye-dot');
 
     function getMaxWidth() {
       return 650;
@@ -234,6 +248,10 @@ And the mome raths outgrabe.`;
             word.element.classList.add('unfocused');
           }
         }
+        
+        eyeDot.style.left = (data.x - 6) + 'px';
+        eyeDot.style.top = (data.y - 6) + 'px';
+        eyeDot.classList.add('active');
       })
       .saveDataAcrossSessions(true)
       .begin();
