@@ -199,23 +199,22 @@ And the mome raths outgrabe.`;
       });
     }
 
-    const scrambleChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/`~';
-    
-    function scrambleWord(wordEl, percent) {
-      const text = wordEl.textContent;
-      if (text.length < 2 || text.trim() === '') return;
+    function shuffleWord(text, percent) {
+      if (text.length < 2 || text.trim() === '') return text;
       
-      let scrambled = '';
-      for (let i = 0; i < text.length; i++) {
-        if (text[i] === ' ') {
-          scrambled += ' ';
-        } else if (Math.random() < percent) {
-          scrambled += scrambleChars[Math.floor(Math.random() * scrambleChars.length)];
-        } else {
-          scrambled += text[i];
-        }
+      const letters = text.split('');
+      const numToShuffle = Math.ceil(letters.length * percent);
+      
+      for (let i = 0; i < numToShuffle; i++) {
+        const idx1 = Math.floor(Math.random() * letters.length);
+        const idx2 = Math.floor(Math.random() * letters.length);
+        
+        const temp = letters[idx1];
+        letters[idx1] = letters[idx2];
+        letters[idx2] = temp;
       }
-      wordEl.textContent = scrambled;
+      
+      return letters.join('');
     }
     
     function restoreWord(wordEl, originalText) {
@@ -269,27 +268,27 @@ And the mome raths outgrabe.`;
             const wordEl = line.words[wi];
             const original = line.originalTexts[wi];
             
-            if (distance === 0 && wordEl === closestWord) {
-              wordEl.classList.add('highlight');
-              wordEl.classList.remove('scramble', 'scramble-25', 'scramble-50', 'scramble-75');
-              restoreWord(wordEl, original);
-            } else if (scramblePercent > 0) {
-              wordEl.classList.remove('highlight');
-              wordEl.classList.add('scramble');
-              
-              if (scramblePercent <= 0.25) {
-                wordEl.classList.add('scramble-25');
-              } else if (scramblePercent <= 0.5) {
-                wordEl.classList.add('scramble-50');
+              if (distance === 0 && wordEl === closestWord) {
+                wordEl.classList.add('highlight');
+                wordEl.classList.remove('scramble', 'scramble-25', 'scramble-50', 'scramble-75');
+                wordEl.textContent = original;
+              } else if (scramblePercent > 0) {
+                wordEl.classList.remove('highlight');
+                wordEl.classList.add('scramble');
+                
+                if (scramblePercent <= 0.25) {
+                  wordEl.classList.add('scramble-25');
+                } else if (scramblePercent <= 0.5) {
+                  wordEl.classList.add('scramble-50');
+                } else {
+                  wordEl.classList.add('scramble-75');
+                }
+                
+                wordEl.textContent = shuffleWord(original, scramblePercent);
               } else {
-                wordEl.classList.add('scramble-75');
+                wordEl.classList.remove('highlight', 'scramble', 'scramble-25', 'scramble-50', 'scramble-75');
+                wordEl.textContent = original;
               }
-              
-              scrambleWord(wordEl, scramblePercent);
-            } else {
-              wordEl.classList.remove('highlight', 'scramble', 'scramble-25', 'scramble-50', 'scramble-75');
-              restoreWord(wordEl, original);
-            }
           }
         }
       }
