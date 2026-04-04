@@ -40,6 +40,12 @@
       line-height: 2.4;
       color: #000;
       text-align: center;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    
+    #poem.visible {
+      opacity: 1;
     }
     
     .line {
@@ -81,16 +87,46 @@
       transform: translateX(6px) rotate(3deg);
     }
     
-    #status {
-      position: fixed;
-      top: 20px;
-      right: 20px;
+    #calibration-prompt {
+      font-size: 18px;
       color: #8b0000;
+      font-weight: bold;
+    }
+    
+    #gaze-status {
       font-size: 14px;
-      background: #f4ecd8;
-      padding: 10px 15px;
-      border: 1px solid #d4c9b0;
-      border-radius: 4px;
+      color: #228b22;
+    }
+    
+    #calibration-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1000;
+    }
+    
+    .calibration-dot {
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      background: #8b0000;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: pulse 1s ease-in-out infinite;
+      transform: translate(-50%, -50%);
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.8; }
+      50% { transform: translate(-50%, -50%) scale(1.3); opacity: 0.4; }
+    }
+    
+    #calibration-overlay.active {
+      pointer-events: auto;
+      cursor: crosshair;
     }
     
     #cursor-dot {
@@ -110,10 +146,15 @@
       opacity: 0.7;
     }
   </style>
+  <script src="webgazer.js" onload="window.webgazerLoaded = true;" onerror="window.webgazerLoaded = false;"></script>
 </head>
 <body>
-  <div id="status">Hover over words</div>
+  <div id="status">
+    <div id="calibration-prompt">Click on dots to calibrate, then look around!</div>
+    <div id="gaze-status" style="display:none;">Eye tracking active</div>
+  </div>
   <div id="cursor-dot"></div>
+  <div id="calibration-overlay"></div>
   
   <div id="container">
     <h1>Jabberwocky</h1>
@@ -164,6 +205,99 @@ And the mome raths outgrabe.`;
     const poemEl = document.getElementById('poem');
     const statusEl = document.getElementById('status');
     const cursorDot = document.getElementById('cursor-dot');
+    const calibrationOverlay = document.getElementById('calibration-overlay');
+    const calibrationPrompt = document.getElementById('calibration-prompt');
+    const gazeStatus = document.getElementById('gaze-status');
+
+    let useEyeTracking = false;
+    let gazeX = 0;
+    let gazeY = 0;
+    let calibrationPoints = [];
+    let calibrationIndex = 0;
+    let calibrationPhase = false;
+
+    const calibrationPositions = [
+      { x: 0.1, y: 0.1 }, { x: 0.5, y: 0.1 }, { x: 0.9, y: 0.1 },
+      { x: 0.1, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.9, y: 0.5 },
+      { x: 0.1, y: 0.9 }, { x: 0.5, y: 0.9 }, { x: 0.9, y: 0.9 }
+    ];
+
+    function showCalibrationPoint() {
+      calibrationOverlay.innerHTML = '';
+      if (calibrationIndex >= calibrationPositions.length) {
+        endCalibration();
+        return;
+      }
+
+      const pos = calibrationPositions[calibrationIndex];
+      const dot = document.createElement('div');
+      dot.className = 'calibration-dot';
+      dot.style.left = (pos.x * window.innerWidth) + 'px';
+      dot.style.top = (pos.y * window.innerHeight) + 'px';
+      calibrationOverlay.appendChild(dot);
+    }
+
+    function startCalibration() {
+      calibrationPhase = true;
+      calibrationIndex = 0;
+      calibrationOverlay.classList.add('active');
+      showCalibrationPoint();
+
+      calibrationOverlay.onclick = (e) => {
+        if (calibrationIndex < calibrationPositions.length) {
+          calibrationIndex++;
+          showCalibrationPoint();
+        }
+      };
+    }
+
+    function endCalibration() {
+      calibrationPhase = false;
+      calibrationOverlay.classList.remove('active');
+      calibrationOverlay.innerHTML = '';
+      calibrationPrompt.style.display = 'none';
+      gazeStatus.style.display = 'block';
+      useEyeTracking = true;
+      document.getElementById('poem').classList.add('visible');
+    }
+
+    function initWebGazer() {
+      console.log('webgazerLoaded:', window.webgazerLoaded);
+      console.log('webgazer global:', typeof webgazer);
+      
+      const webgazerLoaded = window.webgazerLoaded || typeof webgazer !== 'undefined';
+      
+      if (!webgazerLoaded) {
+        console.warn('WebGazer not loaded, falling back to mouse');
+        calibrationPrompt.textContent = 'Eye tracking unavailable - move your mouse';
+        return;
+      }
+
+      webgazer
+        .setRegression('ridge')
+        .setGazeListener((data, elapsedTime) => {
+          if (data) {
+            gazeX = data.x;
+            gazeY = data.y;
+          }
+        })
+        .begin();
+
+      webgazer.params.faceMeshSolutionPath = './mediapipe/face_mesh';
+
+      webgazer.showVideoPreview(false)
+        .showPredictionPoints(false)
+        .showFaceOverlay(false)
+        .showFaceFeedbackBox(false);
+
+      console.log('Starting calibration in 1 second...');
+      setTimeout(() => {
+        console.log('Calling startCalibration...');
+        startCalibration();
+      }, 1000);
+    }
+
+    window.addEventListener('load', initWebGazer);
 
     function getMaxWidth() {
       return 650;
@@ -230,10 +364,11 @@ And the mome raths outgrabe.`;
 
     let currentLineIndex = -1;
     let currentWord = null;
+    let lastMousePosition = { x: 0, y: 0 };
 
-    document.addEventListener('mousemove', (e) => {
-      cursorDot.style.left = e.clientX + 'px';
-      cursorDot.style.top = e.clientY + 'px';
+    function handleMove(x, y) {
+      cursorDot.style.left = x + 'px';
+      cursorDot.style.top = y + 'px';
       cursorDot.classList.add('active');
       
       let closestWord = null;
@@ -246,7 +381,7 @@ And the mome raths outgrabe.`;
           const centerX = rect.left + rect.width / 2;
           const centerY = rect.top + rect.height / 2;
           
-          const distance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+          const distance = Math.hypot(x - centerX, y - centerY);
           
           if (distance < closestDistance && distance < 150) {
             closestDistance = distance;
@@ -333,7 +468,26 @@ And the mome raths outgrabe.`;
       if (closestWord) {
         statusEl.textContent = `Line ${closestLineIndex + 1}`;
       }
+    }
+
+    document.addEventListener('mousemove', (e) => {
+      if (!useEyeTracking) {
+        handleMove(e.clientX, e.clientY);
+      }
     });
+
+    let gazeUpdateInterval = null;
+    if (typeof webgazer !== 'undefined') {
+      gazeUpdateInterval = setInterval(() => {
+        if (useEyeTracking && !calibrationPhase) {
+          webgazer.getCurrentPrediction().then((pred) => {
+            if (pred) {
+              handleMove(pred.x, pred.y);
+            }
+          });
+        }
+      }, 50);
+    }
   </script>
 </body>
 </html>
