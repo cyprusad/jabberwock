@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Jabberwocky - Eye Tracking Demo</title>
+  <title>Jabberwocky - Scramble Demo</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
@@ -33,16 +33,21 @@
     
     #poem {
       font-size: 18px;
-      line-height: 2.2;
+      line-height: 2.4;
       color: #000;
       text-align: left;
+    }
+    
+    .line {
+      margin-bottom: 20px;
+      transition: all 0.5s ease;
     }
     
     .word {
       display: inline-block;
       transition: all 0.3s ease;
-      margin: 3px;
-      padding: 2px 4px;
+      margin: 2px;
+      padding: 2px 3px;
     }
     
     .word.highlight {
@@ -50,7 +55,23 @@
       font-size: 26px;
       transform: scale(1.15);
       font-weight: bold;
-      text-shadow: 2px 2px 4px rgba(139, 0, 0, 0.2);
+    }
+    
+    .word.scramble {
+      color: #666;
+      transition: all 0.4s ease;
+    }
+    
+    .word.scramble-25 {
+      transform: translateX(3px) rotate(2deg);
+    }
+    
+    .word.scramble-50 {
+      transform: translateX(-4px) rotate(-2deg);
+    }
+    
+    .word.scramble-75 {
+      transform: translateX(6px) rotate(3deg);
     }
     
     #status {
@@ -63,19 +84,6 @@
       padding: 10px 15px;
       border: 1px solid #d4c9b0;
       border-radius: 4px;
-    }
-    
-    #info {
-      position: fixed;
-      bottom: 20px;
-      left: 20px;
-      background: #f4ecd8;
-      color: #2c2416;
-      padding: 15px 20px;
-      border: 1px solid #d4c9b0;
-      border-radius: 4px;
-      font-size: 14px;
-      max-width: 300px;
     }
     
     #cursor-dot {
@@ -97,9 +105,8 @@
   </style>
 </head>
 <body>
-  <div id="status">Move mouse over words</div>
+  <div id="status">Hover over words</div>
   <div id="cursor-dot"></div>
-  <div id="info">Move your cursor over the words to highlight them</div>
   
   <div id="container">
     <h1>Jabberwocky</h1>
@@ -149,7 +156,6 @@ And the mome raths outgrabe.`;
 
     const poemEl = document.getElementById('poem');
     const statusEl = document.getElementById('status');
-    const infoEl = document.getElementById('info');
     const cursorDot = document.getElementById('cursor-dot');
 
     function getMaxWidth() {
@@ -159,13 +165,15 @@ And the mome raths outgrabe.`;
     const prepared = prepareWithSegments(TEXT, FONT, { whiteSpace: 'pre-wrap' });
     const { lines } = layoutWithLines(prepared, getMaxWidth(), LINE_HEIGHT);
 
-    const wordElements = [];
+    const linesData = [];
 
     for (let li = 0; li < lines.length; li++) {
       const line = lines[li];
       const words = line.text.split(/(\s+)/);
       const lineDiv = document.createElement('div');
-      lineDiv.style.marginBottom = '24px';
+      lineDiv.className = 'line';
+      
+      const lineWords = [];
       
       for (let wi = 0; wi < words.length; wi++) {
         const wordText = words[wi];
@@ -179,16 +187,42 @@ And the mome raths outgrabe.`;
         wordSpan.textContent = wordText;
         lineDiv.appendChild(wordSpan);
         
-        wordElements.push(wordSpan);
+        lineWords.push(wordSpan);
       }
       
       poemEl.appendChild(lineDiv);
+      
+      linesData.push({
+        element: lineDiv,
+        words: lineWords,
+        originalTexts: lineWords.map(w => w.textContent)
+      });
     }
 
-    setTimeout(() => {
-      statusEl.textContent = 'Ready! Move mouse over words';
-      setTimeout(() => { infoEl.style.display = 'none'; }, 5000);
-    }, 1000);
+    const scrambleChars = '!@#$%^&*()_+-=[]{}|;:,.<>?/`~';
+    
+    function scrambleWord(wordEl, percent) {
+      const text = wordEl.textContent;
+      if (text.length < 2 || text.trim() === '') return;
+      
+      let scrambled = '';
+      for (let i = 0; i < text.length; i++) {
+        if (text[i] === ' ') {
+          scrambled += ' ';
+        } else if (Math.random() < percent) {
+          scrambled += scrambleChars[Math.floor(Math.random() * scrambleChars.length)];
+        } else {
+          scrambled += text[i];
+        }
+      }
+      wordEl.textContent = scrambled;
+    }
+    
+    function restoreWord(wordEl, originalText) {
+      wordEl.textContent = originalText;
+    }
+
+    let currentLineIndex = -1;
 
     document.addEventListener('mousemove', (e) => {
       cursorDot.style.left = e.clientX + 'px';
@@ -196,27 +230,72 @@ And the mome raths outgrabe.`;
       cursorDot.classList.add('active');
       
       let closestWord = null;
+      let closestLineIndex = -1;
       let closestDistance = Infinity;
       
-      for (const wordEl of wordElements) {
-        const rect = wordEl.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        
-        const distance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
-        
-        if (distance < closestDistance && distance < 80) {
-          closestDistance = distance;
-          closestWord = wordEl;
+      for (let li = 0; li < linesData.length; li++) {
+        for (const wordEl of linesData[li].words) {
+          const rect = wordEl.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          
+          const distance = Math.hypot(e.clientX - centerX, e.clientY - centerY);
+          
+          if (distance < closestDistance && distance < 80) {
+            closestDistance = distance;
+            closestWord = wordEl;
+            closestLineIndex = li;
+          }
         }
       }
       
-      for (const wordEl of wordElements) {
-        if (wordEl === closestWord) {
-          wordEl.classList.add('highlight');
-        } else {
-          wordEl.classList.remove('highlight');
+      if (closestLineIndex !== currentLineIndex) {
+        currentLineIndex = closestLineIndex;
+        
+        for (let li = 0; li < linesData.length; li++) {
+          const line = linesData[li];
+          const distance = Math.abs(li - currentLineIndex);
+          
+          let scramblePercent = 0;
+          if (currentLineIndex >= 0) {
+            if (li < currentLineIndex) {
+              scramblePercent = (currentLineIndex - li) * 0.25;
+            } else if (li > currentLineIndex) {
+              scramblePercent = (li - currentLineIndex) * 0.25;
+            }
+          }
+          
+          for (let wi = 0; wi < line.words.length; wi++) {
+            const wordEl = line.words[wi];
+            const original = line.originalTexts[wi];
+            
+            if (distance === 0 && wordEl === closestWord) {
+              wordEl.classList.add('highlight');
+              wordEl.classList.remove('scramble', 'scramble-25', 'scramble-50', 'scramble-75');
+              restoreWord(wordEl, original);
+            } else if (scramblePercent > 0) {
+              wordEl.classList.remove('highlight');
+              wordEl.classList.add('scramble');
+              
+              if (scramblePercent <= 0.25) {
+                wordEl.classList.add('scramble-25');
+              } else if (scramblePercent <= 0.5) {
+                wordEl.classList.add('scramble-50');
+              } else {
+                wordEl.classList.add('scramble-75');
+              }
+              
+              scrambleWord(wordEl, scramblePercent);
+            } else {
+              wordEl.classList.remove('highlight', 'scramble', 'scramble-25', 'scramble-50', 'scramble-75');
+              restoreWord(wordEl, original);
+            }
+          }
         }
+      }
+      
+      if (closestWord) {
+        statusEl.textContent = `Line ${closestLineIndex + 1}`;
       }
     });
   </script>
