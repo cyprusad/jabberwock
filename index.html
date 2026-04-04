@@ -29,13 +29,17 @@
       font-weight: normal;
       border-bottom: 1px solid #d4c9b0;
       padding-bottom: 20px;
+      position: sticky;
+      top: 0;
+      background: #f4ecd8;
+      z-index: 100;
     }
     
     #poem {
       font-size: 18px;
       line-height: 2.4;
       color: #000;
-      text-align: left;
+      text-align: center;
     }
     
     .line {
@@ -305,6 +309,23 @@ And the mome raths outgrabe.`;
                 wordEl.style.color = '#000000';
                 wordEl.textContent = original;
               }
+          }
+        }
+      } else if (wordChanged && closestWord) {
+        const line = linesData[currentLineIndex];
+        for (let wi = 0; wi < line.words.length; wi++) {
+          const wordEl = line.words[wi];
+          const original = line.originalTexts[wi];
+          
+          if (wordEl === closestWord) {
+            wordEl.classList.add('highlight');
+            wordEl.classList.remove('scramble', 'scramble-25', 'scramble-50', 'scramble-75');
+            wordEl.style.color = '#8b0000';
+            wordEl.textContent = original;
+          } else {
+            wordEl.classList.remove('highlight');
+            wordEl.style.color = '#000000';
+            wordEl.textContent = original;
           }
         }
       }
