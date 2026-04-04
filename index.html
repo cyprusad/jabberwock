@@ -225,7 +225,6 @@ And the mome raths outgrabe.`;
     }
 
     let currentLineIndex = -1;
-    let currentWord = null;
 
     document.addEventListener('mousemove', (e) => {
       cursorDot.style.left = e.clientX + 'px';
@@ -252,9 +251,8 @@ And the mome raths outgrabe.`;
         }
       }
       
-      if (closestLineIndex !== currentLineIndex || closestWord !== currentWord) {
+      if (closestLineIndex !== currentLineIndex) {
         currentLineIndex = closestLineIndex;
-        currentWord = closestWord;
         
         for (let li = 0; li < linesData.length; li++) {
           const line = linesData[li];
