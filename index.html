@@ -23,12 +23,12 @@
       color: #2c2416;
       text-align: center;
       font-size: 32px;
-      margin-bottom: 40px;
+      margin: 40px 0;
       letter-spacing: 4px;
       text-transform: uppercase;
       font-weight: normal;
       border-bottom: 1px solid #d4c9b0;
-      padding-bottom: 20px;
+      padding: 20px 0;
       position: sticky;
       top: 0;
       background: #f4ecd8;
@@ -216,6 +216,20 @@ And the mome raths outgrabe.`;
     let calibrationIndex = 0;
     let calibrationPhase = false;
 
+    // Smoothing for eye tracking - average recent positions
+    const gazeHistory = [];
+    const SMOOTHING_WINDOW = 10;
+    
+    function smoothGaze(x, y) {
+      gazeHistory.push({ x, y });
+      if (gazeHistory.length > SMOOTHING_WINDOW) {
+        gazeHistory.shift();
+      }
+      const avgX = gazeHistory.reduce((sum, p) => sum + p.x, 0) / gazeHistory.length;
+      const avgY = gazeHistory.reduce((sum, p) => sum + p.y, 0) / gazeHistory.length;
+      return { x: avgX, y: avgY };
+    }
+
     const calibrationPositions = [
       { x: 0.1, y: 0.1 }, { x: 0.5, y: 0.1 }, { x: 0.9, y: 0.1 },
       { x: 0.1, y: 0.5 }, { x: 0.5, y: 0.5 }, { x: 0.9, y: 0.5 },
@@ -274,15 +288,19 @@ And the mome raths outgrabe.`;
       }
 
       webgazer
-        .setRegression('ridge')
+        .setRegression('weightedRidge')
         .setGazeListener((data, elapsedTime) => {
           if (data) {
-            gazeX = data.x;
-            gazeY = data.y;
+            const smoothed = smoothGaze(data.x, data.y);
+            gazeX = smoothed.x;
+            gazeY = smoothed.y;
           }
         })
         .begin();
 
+      // Enable Kalman filter for smoothing
+      webgazer.applyKalmanFilter(true);
+      
       webgazer.params.faceMeshSolutionPath = './mediapipe/face_mesh';
 
       webgazer.showVideoPreview(false)
